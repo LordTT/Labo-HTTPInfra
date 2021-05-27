@@ -49,3 +49,41 @@ In the Dockerfile we will first create the image based on the `node:14.17` image
 
 
 ### Config
+
+## Part 3
+
+### Demo
+
+First thing to do is to start the two previous containers:  
+1. `docker run -d --name apache_static res/apache_php`
+1. `docker run -d --name express_dynamic res/express_students`
+
+Next step is to get their ip address:
+1. `docker inspect apache_php | grep -i ipaddres`
+1. `docker inspect express_dynamic | grep -i ipaddres`
+
+Once you've got the two ip addresses we need to update the file `conf/sites-available/001-reverse-proxy.conf` with the ip addresses from the previous step.
+
+Now we can build and run the reverse proxy container:
+1. `docker build -t res/apache_rp .`
+1. `docker run -d -p 8080:80 res/apache_rp`
+
+To test the routing the following steps need to work:  
+1. accessing via `http://localhost:8080` should not work with a 403 error
+1. accessing via `http://localhost:8080` and specifying the header host = demo.res.ch (or by adding the line `localhost demo.res.ch` inside hosts file and accessing through `http://demo.res.ch:8080`) should show a web page from static container
+1. accessing via `http://localhost:8080/api/students/` with host=demo.res.ch should show a page with json data from dynamic container
+
+### Dockerfile
+In the Dockerfile we will first create the image based on the `php:7.2-apache` image and then copy the files for the host folder `./conf` to the container folder `/etc/apache2`.
+
+Next step is to enable the apache modules that allow reverse proxy `proxy` and `proxy_http`
+
+After that we enable the sites from the conf directory
+
+### Why static configuration is fragile
+The ip addresses from containers are dynamicaly assigned. It means that it will possibly not work at the next time we run all the containers as they may have changed their ip addresses.
+
+### Why servers cannot be reached directly
+First of all that's only true for non Linux OS. On Linux we can access each container without port mapping via their ip addres `ping <container_ip>` will work.
+
+For other OS than Linux docker creates a Linux vm to run the containers which makes them unreachable from outside the vm we can still access them by doing a port mapping. You can simply `ping <container_ip>` and it will not work.
