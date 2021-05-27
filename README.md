@@ -87,3 +87,20 @@ The ip addresses from containers are dynamicaly assigned. It means that it will 
 First of all that's only true for non Linux OS. On Linux we can access each container without port mapping via their ip addres `ping <container_ip>` will work.
 
 For other OS than Linux docker creates a Linux vm to run the containers which makes them unreachable from outside the vm we can still access them by doing a port mapping. You can simply `ping <container_ip>` and it will not work.
+
+## Part 4
+
+### Demo
+As we have made change on the website files we need to rebuild the image `res/apache_php`.
+Launch all containers like in [Part 3](#part-3) and access `http://demo.res.ch:8080` on your browser. Now you should see message from aliens that are auto updated each 10 seconds.
+
+### Prove that request are send by the browser
+Here we can see all the request send by the browser to our api:
+![send request](./pictures/send_request_ajax.png)
+On the left side we can see the requests and on the right side we see the response from the selected request.
+
+### Why it would not work without reverse proxy
+If we were not using a reverse proxy the browser would block any request that tries to access data from a different top level domain (anything that comes from another domain than res.ch) due to the cross origin policy.
+
+### Configuration
+For this step we only changed content files.
