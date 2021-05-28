@@ -202,8 +202,6 @@ To be able to use the balancer we had to add the `proxy_balancer` and `lbmethod_
 
 To validate this step we used to technique described in the demo by using 2 different container for the static part and change some of the static data to be able to see which one is used. 
 
-7r68ii76666666666666666666666666666666666666666
-
 ## Load balancing: round-robin vs sticky sessions
 
 For this step we improved the load balancing by implementing sticky sessions
