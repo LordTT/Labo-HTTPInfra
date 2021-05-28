@@ -129,6 +129,198 @@ This file is executed by the php:7.2-apache image so we added code here to execu
 ### config-template.php
 This is a php script that creates the file `001-reverse-proxy.conf` containing the values from environment variables.
 
+## Load balancing: multiple server nodes
+
+For this step we extended the reverse proxy configuration to support load balancing.
+
+### Demo
+
+A new docker image has been created for this step the `apache-php-image2` image. This image is a simple copy of the `apache-php-image` image with some static data changing to be able to diffrerenciate between the 2 possible containers that can be used by the load balancer.
+
+First thing to do is to build the new docker image by running the `docker build -t res/apache_php2 .` command in the new docker image folder.
+
+After that you need to run 2 express_students containers and the apache_php and apache_php2 containers:
+
+        docker run -d --name apache_static res/apache_php
+        docker run -d --name apache_static2 res/apache_php2
+        docker run -d --name express_dynamic res/express_students
+        docker run -d --name express_dynamic2 res/express_students2
+        
+The next step is to get the ip adresses of each of the containers:
+
+        docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static
+        docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static2
+        docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic
+        docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic2
+       
+Finally you need to run the reverse proxy container with the correct variables. Be careful to replace the ip adresses below with the ones you got with the above command:
+
+```
+docker run -d -e STATIC_APP_1=172.17.0.2:80 -e STATIC_APP_2=172.17.0.3:80 -e DYNAMIC_APP_1=172.17.0.4:3000 -e DYNAMIC_APP_2=172.17.0.5:3000 -p 8080:80 --name apache-rp res/apache_rp
+```
+
+Now just connect to the http://demo.res.ch:8080 adress via you browser and you will be able to see our website. If you refresh a few times the page (without the cache) you will be able to see the load balancer switching between the 2 static containers and if you take a look at the logs of the dynamic containers you will be able to see that both are used.
+
+### Configuration
+
+#### config-template.php
+
+For this part we had to modify the `config-template.php` file of the `apache-reverse-proxy` folder:
+
+        <VirtualHost *:80>
+            ServerName demo.res.ch
+
+            #ErrorLog ${APACHE_LOG_DIR}/error.log
+            #CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+
+            <Proxy balancer://dynamic_app>
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_1')?>'
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_2')?>'
+            </Proxy>
+
+            <Proxy balancer://static_app>
+                BalancerMember 'http://<?=getenv('STATIC_APP_1')?>'
+                BalancerMember 'http://<?=getenv('STATIC_APP_2')?>'
+            </Proxy>
+
+            ProxyPass "/api/students" "balancer://dynamic_app/"
+            ProxyPassReverse "/api/students" "balancer://dynamic_app/"
+
+            ProxyPass "/" "balancer://static_app/"
+            ProxyPassReverse "/" "balancer://static_app/"
+        </VirtualHost>
+        
+We added the balancers and modified the environement variables.
+
+#### Dockerfile
+We had to modify the of the `apache-reverse-proxy` folder's Dockerfile.
+
+To be able to use the balancer we had to add the `proxy_balancer` and `lbmethod_byrequests` modules to the `RUN a2enmod command`
+
+### Validation procedure
+
+To validate this step we used to technique described in the demo by using 2 different container for the static part and change some of the static data to be able to see which one is used. 
+
+## Load balancing: round-robin vs sticky sessions
+
+For this step we improved the load balancing by implementing sticky sessions
+
+### Demo
+
+For this step the manipulations are the same as in the previous step
+
+When you'll connect to the website you'll see that even when refreshing (without the cache) you'll use the same static container. This is caused by the sticky session. If you use an other browser you will use the other container and continue using it. The dynamic containers are both used by both the browsers as they still work in round-robin.
+
+### Configuration
+
+#### config-template.php
+
+For this part we had to modify the `config-template.php` file of the `apache-reverse-proxy` folder:
+
+       <VirtualHost *:80>
+            ServerName demo.res.ch
+
+            #ErrorLog ${APACHE_LOG_DIR}/error.log
+            #CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+                Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+
+            <Proxy balancer://dynamic_app>
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_1')?>'
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_2')?>'
+            </Proxy>
+
+            <Proxy balancer://static_app>
+                BalancerMember 'http://<?=getenv('STATIC_APP_1')?>' route=1
+                BalancerMember 'http://<?=getenv('STATIC_APP_2')?>' route=2
+                        ProxySet lbmethod=byrequests
+                ProxySet stickysession=ROUTEID
+            </Proxy>
+
+            ProxyPass "/api/students" "balancer://dynamic_app/"
+            ProxyPassReverse "/api/students" "balancer://dynamic_app/"
+
+            ProxyPass "/" "balancer://static_app/"
+            ProxyPassReverse "/" "balancer://static_app/"
+        </VirtualHost>
+        
+We added a header for the cookies and enbled the sticky sessions for the static_app balancer by using the `ProxySet stickysession=ROUTE` and adding ids to the two static apps.
+
+#### Dockerfile
+
+To be able to use the cookie headers we had to add the `headers` module to the `RUN a2enmod command`
+
+### Validation procedure
+
+To validate this step we used to technique described in the demo by using 2 different container for the static part and change some of the static data to be able to see which one is used.
+
+2tz72zhg982h8932hg32809gh2389gh38290
+
+## Dynamic cluster management 
+
+For this step we used a cluster manager that can update dynamically the server nodes
+
+### Demo
+
+For this step the manipulations are the same as in the previous step.
+
+When you'll connect to the website everything will work as in the previous step. By connecting to the `http://demo.res.ch:8080/balancer-manager` adress you will be able to acess the cluster manager page. 
+
+To test this tool you can open the static node your website is using (1.) and activate the "stopped" option (2.). Now if you refresh the main website you will see that you are using the other static node despite the sticky session. That is because you dynamically stopped the one you were using previously.
+
+### Configuration
+
+#### config-template.php
+
+For this part we had to modify the `config-template.php` file of the `apache-reverse-proxy` folder:
+
+     <VirtualHost *:80>
+            ServerName demo.res.ch
+
+            #ErrorLog ${APACHE_LOG_DIR}/error.log
+            #CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+                Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+
+            <Proxy balancer://dynamic_app>
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_1')?>'
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_2')?>'
+            </Proxy>
+
+            <Proxy balancer://static_app>
+                BalancerMember 'http://<?=getenv('STATIC_APP_1')?>' route=1
+                BalancerMember 'http://<?=getenv('STATIC_APP_2')?>' route=2
+                        ProxySet lbmethod=byrequests
+                ProxySet stickysession=ROUTEID
+            </Proxy>
+
+                <Location "/balancer-manager">
+                        SetHandler balancer-manager
+                </Location>
+                ProxyPass /balancer-manager !
+
+            ProxyPass "/api/students" "balancer://dynamic_app/"
+            ProxyPassReverse "/api/students" "balancer://dynamic_app/"
+
+            ProxyPass "/" "balancer://static_app/"
+            ProxyPassReverse "/" "balancer://static_app/"
+        </VirtualHost>
+        
+We added a header for the cookies and enbled the sticky sessions for the static_app balancer by using the `ProxySet stickysession=ROUTE` and adding ids to the two static apps.
+
+### Validation procedure
+
+To validate this step we used the technique described in the demo. With this we can see that we can disable one of the clusters. 
+
+Furthermore if we disable the two static nodes the website becomes inavailable.
+
+![nostatic](./pictures/nostatic.PNG)
+
+ And if we disable the two dynamic ones the website can't fetch the alien messages.
+
+![nodynamic](./pictures/nodynamic.PNG)
+
 ## Management UI
 
 For this step we decided to chose a web app named `portainer.io` that makes possible to manage docker through the web browser.
