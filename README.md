@@ -128,3 +128,45 @@ This file is executed by the php:7.2-apache image so we added code here to execu
 
 ### config-template.php
 This is a php script that creates the file `001-reverse-proxy.conf` containing the values from environment variables.
+
+## Management UI
+
+For this step we decided to chose a web app named `portainer.io` that makes possible to manage docker through the web browser.
+
+### How to install
+Linux:
+```bash
+docker volume create portainer_data
+
+docker run -d -p 8000:8000 -p 9000:9000 --name=portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
+```
+
+Windows:
+Before to deply on windows you need to install WSL [more info](https://docs.microsoft.com/en-us/windows/wsl/install-win10)
+
+```
+docker volume create portainer_data
+
+docker run -d -p 8000:8000 -p 9000:9000 --name=portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
+```
+
+Once the container running you can access the web app [http://localhost:9000](http://localhost:9000) and create a user
+
+### Validation procedure
+Below we can see the initial state of all containers on portainer and docker ps.
+![containers ps](./pictures/portainer-ps-1.png)
+
+Now by clicking on Add container we have a new page where we can add a new container.
+![add container portainer](./pictures/portainer-add-container.png)
+
+After filling the name the image and set autoremove to true we can see that our container as been added to the list, we can also find im with a docker ps
+![container ps](./pictures/portainer-ps-2.png)
+
+Containers added from the terminal are also added to the portainer container list
+![container ps](./pictures/portainer-ps-3.png)
+
+If we stop a container that as not the flag auto remove it will show as stopped and can be restarted.
+![container ps](./pictures/portainer-ps-4.png)
+
+If we stop a container that as the flag auto remove it will be removed when stopped. Ex with apache_static:
+![container ps](./pictures/portainer-ps-5.png)
