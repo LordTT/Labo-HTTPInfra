@@ -18,6 +18,11 @@
         ProxySet stickysession=ROUTEID
     </Proxy>
 	
+	<Location "/balancer-manager">
+		SetHandler balancer-manager
+	</Location>
+	ProxyPass /balancer-manager !
+	
     ProxyPass "/api/students" "balancer://dynamic_app/"
     ProxyPassReverse "/api/students" "balancer://dynamic_app/"
 
