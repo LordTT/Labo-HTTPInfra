@@ -161,7 +161,7 @@ After that you need to run 2 express_students containers and the apache_php and 
         docker run -d --name apache_static res/apache_php
         docker run -d --name apache_static2 res/apache_php2
         docker run -d --name express_dynamic res/express_students
-        docker run -d --name express_dynamic2 res/express_students2
+        docker run -d --name express_dynamic2 res/express_students
         
 The next step is to get the ip adresses of each of the containers:
 
