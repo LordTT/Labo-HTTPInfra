@@ -3,7 +3,7 @@ Repo for the HTTPInfra lab from the RES course at HEIG-VD
 
 ## Part 1
 
-For this step we will build a Docker image, run a Docker container and access its content froma browser
+For this step we will build a Docker image, run a Docker container and access its content from a browser.
 
 ### Demo
 
