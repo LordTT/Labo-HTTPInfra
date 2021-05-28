@@ -154,7 +154,9 @@ For this step we extended the reverse proxy configuration to support load balanc
 
 A new docker image has been created for this step the `apache-php-image2` image. This image is a simple copy of the `apache-php-image` image with some static data changing to be able to diffrerenciate between the 2 possible containers that can be used by the load balancer.
 
-First thing to do is to build the new docker image by running the `docker build -t res/apache_php2 .` command in the new docker image folder.
+First thing to do is to build the new docker image by running the `docker build -t res/apache_php2 .` command in the `apache-php-image2` folder.
+
+You also need to rebuild the reverse proxy image by running the `docker build -t res/apache_rp .` command in the `apache-reverse-proxy` folder.
 
 After that you need to run 2 express_students containers and the apache_php and apache_php2 containers:
 
