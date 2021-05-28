@@ -247,8 +247,6 @@ For this part we had to modify the `config-template.php` file of the `apache-rev
         
 We added a header for the cookies and enbled the sticky sessions for the static_app balancer by using the `ProxySet stickysession=ROUTE` and adding ids to the two static apps.
 
-
-
 #### Dockerfile
 
 To be able to use the cookie headers we had to add the `headers` module to the `RUN a2enmod command`
@@ -256,6 +254,72 @@ To be able to use the cookie headers we had to add the `headers` module to the `
 ### Validation procedure
 
 To validate this step we used to technique described in the demo by using 2 different container for the static part and change some of the static data to be able to see which one is used.
+
+2tz72zhg982h8932hg32809gh2389gh38290
+
+## Dynamic cluster management 
+
+For this step we used a cluster manager that can update dynamically the server nodes
+
+### Demo
+
+For this step the manipulations are the same as in the previous step.
+
+When you'll connect to the website everything will work as in the previous step. By connecting to the `http://demo.res.ch:8080/balancer-manager` adress you will be able to acess the cluster manager page. 
+
+To test this tool you can open the static node your website is using (1.) and activate the "stopped" option (2.). Now if you refresh the main website you will see that you are using the other static node despite the sticky session. That is because you dynamically stopped the one you were using previously.
+
+### Configuration
+
+#### config-template.php
+
+For this part we had to modify the `config-template.php` file of the `apache-reverse-proxy` folder:
+
+     <VirtualHost *:80>
+            ServerName demo.res.ch
+
+            #ErrorLog ${APACHE_LOG_DIR}/error.log
+            #CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+                Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+
+            <Proxy balancer://dynamic_app>
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_1')?>'
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_2')?>'
+            </Proxy>
+
+            <Proxy balancer://static_app>
+                BalancerMember 'http://<?=getenv('STATIC_APP_1')?>' route=1
+                BalancerMember 'http://<?=getenv('STATIC_APP_2')?>' route=2
+                        ProxySet lbmethod=byrequests
+                ProxySet stickysession=ROUTEID
+            </Proxy>
+
+                <Location "/balancer-manager">
+                        SetHandler balancer-manager
+                </Location>
+                ProxyPass /balancer-manager !
+
+            ProxyPass "/api/students" "balancer://dynamic_app/"
+            ProxyPassReverse "/api/students" "balancer://dynamic_app/"
+
+            ProxyPass "/" "balancer://static_app/"
+            ProxyPassReverse "/" "balancer://static_app/"
+        </VirtualHost>
+        
+We added a header for the cookies and enbled the sticky sessions for the static_app balancer by using the `ProxySet stickysession=ROUTE` and adding ids to the two static apps.
+
+### Validation procedure
+
+To validate this step we used the technique described in the demo. With this we can see that we can disable one of the clusters. 
+
+Furthermore if we disable the two static nodes the website becomes inavailable.
+
+![nostatic](./pictures/nostatic.PNG)
+
+ And if we disable the two dynamic ones the website can't fetch the alien messages.
+
+![nodynamic](./pictures/nodynamic.PNG)
 
 ## Management UI
 
