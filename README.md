@@ -129,6 +129,79 @@ This file is executed by the php:7.2-apache image so we added code here to execu
 ### config-template.php
 This is a php script that creates the file `001-reverse-proxy.conf` containing the values from environment variables.
 
+## Load balancing: multiple server nodes
+
+For this step we extended the reverse proxy configuration to support load balancing.
+
+### Demo
+
+A new docker image has been created for this step the `apache-php-image2` image. This image is a simple copy of the `apache-php-image` image with some static data changing to be able to diffrerenciate between the 2 possible containers that can be used by the load balancer.
+
+First thing to do is to build the new docker image by running the `docker build -t res/apache_php2 .` command in the new docker image folder.
+
+After that you need to run 2 express_students containers and the apache_php and apache_php2 containers:
+
+        docker run -d --name apache_static res/apache_php
+        docker run -d --name apache_static2 res/apache_php2
+        docker run -d --name express_dynamic res/express_students
+        docker run -d --name express_dynamic2 res/express_students2
+        
+The next step is to get the ip adresses of each of the containers:
+
+        docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static
+        docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static2
+        docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic
+        docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic2
+       
+Finally you need to run the reverse proxy container with the correct variables. Be careful to replace the ip adresses below with the ones you got with the above command:
+
+```
+docker run -d -e STATIC_APP_1=172.17.0.2:80 -e STATIC_APP_2=172.17.0.3:80 -e DYNAMIC_APP_1=172.17.0.4:3000 -e DYNAMIC_APP_2=172.17.0.5:3000 -p 8080:80 --name apache-rp res/apache_rp
+```
+
+Now just connect to the http://demo.res.ch:8080 adress via you browser and you will be able to see our website. If you refresh a few times the page (without the cache) you will be able to see the load balancer switching between the 2 static containers and if you take a look at the logs of the dynamic containers you will be able to see that both are used.
+
+### Configuration
+
+#### config-template.php
+
+For this part we had to modify the `config-template.php` file of the `apache-reverse-proxy` folder:
+
+        <VirtualHost *:80>
+            ServerName demo.res.ch
+
+            #ErrorLog ${APACHE_LOG_DIR}/error.log
+            #CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+
+            <Proxy balancer://dynamic_app>
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_1')?>'
+                BalancerMember 'http://<?=getenv('DYNAMIC_APP_2')?>'
+            </Proxy>
+
+            <Proxy balancer://static_app>
+                BalancerMember 'http://<?=getenv('STATIC_APP_1')?>'
+                BalancerMember 'http://<?=getenv('STATIC_APP_2')?>'
+            </Proxy>
+
+            ProxyPass "/api/students" "balancer://dynamic_app/"
+            ProxyPassReverse "/api/students" "balancer://dynamic_app/"
+
+            ProxyPass "/" "balancer://static_app/"
+            ProxyPassReverse "/" "balancer://static_app/"
+        </VirtualHost>
+        
+We added the balancers and modified the environement variables.
+
+#### Dockerfile
+We had to modify the of the `apache-reverse-proxy` folder's Dockerfile.
+
+To be able to use the balancer we had to add the `proxy_balancer` and `lbmethod_byrequests` modules to the `RUN a2enmod command`
+
+### Validation procedure
+
+To validate this step we used to technique described in the demo by using 2 different container for the static part and change some of the static data to be able to see which one is used. 
+
 ## Management UI
 
 For this step we decided to chose a web app named `portainer.io` that makes possible to manage docker through the web browser.
